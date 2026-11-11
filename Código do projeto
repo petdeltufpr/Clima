@@ -1,0 +1,134 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+#include <BME280I2C.h>
+#include <EnvironmentCalculations.h>
+#include <MQ135.h>
+
+#define SENSOR 34
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+#define LED1_R 4
+#define LED1_G 16
+#define LED1_B 17
+#define LED2_R 5
+#define LED2_G 18
+#define LED2_B 19
+#define LED3_R 25
+#define LED3_G 26
+#define LED3_B 27
+
+const char* rede = "SEU_WIFI_AQUI";
+const char* senha = "SUA_SENHA_AQUI";
+const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbyNHz3F8mXqx9-uFJFj3z4uul2FSeBzzzUxRghfeuU4xDTGiHOFtaYNGnd03J_eCMYw/exec";
+
+unsigned long ultimoEnvio = 0;
+const long intervaloEnvio = 60000; 
+
+MQ135 gasSensor = MQ135(SENSOR);
+BME280I2C bme;
+
+float umidade, pressao, temperatura, ppm, altitude, pontoorvalho;
+
+void setCorRGB(int pinR, int pinG, int pinB, bool r, bool g, bool b);
+void enviarParaGoogleSheets(float temp, float hum, float pres, float gas, float alt, float dew);
+
+void setup (){
+  Serial.begin(115200);
+  Wire.begin(I2C_SDA, I2C_SCL); 
+
+  pinMode(LED1_R, OUTPUT); pinMode(LED1_G, OUTPUT); pinMode(LED1_B, OUTPUT);
+  pinMode(LED2_R, OUTPUT); pinMode(LED2_G, OUTPUT); pinMode(LED2_B, OUTPUT);
+  pinMode(LED3_R, OUTPUT); pinMode(LED3_G, OUTPUT); pinMode(LED3_B, OUTPUT);
+
+  setCorRGB(LED3_R, LED3_G, LED3_B, true, true, false);
+
+  if (!bme.begin()){
+    setCorRGB(LED3_R, LED3_G, LED3_B, true, false, false);
+  } else {
+    setCorRGB(LED3_R, LED3_G, LED3_B, false, true, false);
+  }
+
+  WiFi.begin(rede, senha);
+  setCorRGB(LED1_R, LED1_G, LED1_B, true, true, false);
+
+  int tentativas = 0;
+  while (WiFi.status() != WL_CONNECTED && tentativas < 20){
+    delay(500); 
+    tentativas++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    setCorRGB(LED1_R, LED1_G, LED1_B, false, true, false);
+  } else {
+    setCorRGB(LED1_R, LED1_G, LED1_B, true, false, false);
+  }
+}
+
+void loop (){
+  if (WiFi.status() != WL_CONNECTED) {
+    setCorRGB(LED1_R, LED1_G, LED1_B, true, false, false);
+  } else {
+    setCorRGB(LED1_R, LED1_G, LED1_B, false, true, false);
+  }
+  bme.read(pressao, temperatura, umidade, BME280::TempUnit_Celsius, BME280::PresUnit_hPa);
+  ppm = gasSensor.getPPM();
+  
+  altitude = EnvironmentCalculations::Altitude(pressao, EnvironmentCalculations::AltitudeUnit_Meters, 1025.0, temperatura, EnvironmentCalculations::TempUnit_Celsius);
+  pontoorvalho = EnvironmentCalculations::DewPoint(temperatura, umidade, EnvironmentCalculations::TempUnit_Celsius);
+
+  if (millis() - ultimoEnvio >= intervaloEnvio) {
+    ultimoEnvio = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+      enviarParaGoogleSheets(temperatura, umidade, pressao, ppm, altitude, pontoorvalho);
+    }
+  }
+
+  delay(1000);
+}
+
+void enviarParaGoogleSheets(float temp, float hum, float pres, float gas, float alt, float dew) {
+  HTTPClient http;
+  
+  setCorRGB(LED2_R, LED2_G, LED2_B, true, true, false);
+
+  String url = String(googleScriptURL) + "?temperatura=" + String(temp) + 
+               "&umidade=" + String(hum) + 
+               "&pressao=" + String(pres) + 
+               "&ppm=" + String(gas) + 
+               "&altitude=" + String(alt) + 
+               "&orvalho=" + String(dew);
+  http.begin(url);
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode > 0) {
+    setCorRGB(LED2_R, LED2_G, LED2_B, false, true, false);
+  } else {
+    setCorRGB(LED2_R, LED2_G, LED2_B, true, false, false);
+  }
+  
+  http.end();
+}
+
+void setCorRGB(int pinR, int pinG, int pinB, bool r, bool g, bool b) {
+  // Controle do Vermelho
+  if (r == true) {
+    digitalWrite(pinR, HIGH);
+  } else {
+    digitalWrite(pinR, LOW);
+  }
+  // Controle do Verde
+  if (g == true) {
+    digitalWrite(pinG, HIGH);
+  } else {
+    digitalWrite(pinG, LOW);
+  }
+  // Controle do Azul
+  if (b == true) {
+    digitalWrite(pinB, HIGH);
+  } else {
+    digitalWrite(pinB, LOW);
+  }
+}
+

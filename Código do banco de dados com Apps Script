@@ -1,0 +1,118 @@
+function doGet(e) {
+  var sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getActiveSheet();
+
+  var temperatura = Number(e.parameter.temperatura);
+  var umidade = Number(e.parameter.umidade);
+  var pressao = Number(e.parameter.pressao);
+  var ppm = Number(e.parameter.ppm);
+  var altitude = Number(e.parameter.altitude);
+  var orvalho = Number(e.parameter.orvalho);
+
+  var valores = [
+    temperatura,
+    umidade,
+    pressao,
+    ppm,
+    altitude,
+    orvalho
+  ];
+
+  if (!valores.every(Number.isFinite)) {
+    return ContentService.createTextOutput(
+      "Erro: dados invalidos"
+    );
+  }
+
+  var dataHora = new Date();
+
+  // 1. Salvar no Google Sheets
+  sheet.appendRow([
+    dataHora,
+    temperatura,
+    umidade,
+    pressao,
+    ppm,
+    altitude,
+    orvalho
+  ]);
+
+  // 2. Enviar para Adafruit IO
+  var resultado = enviarAdafruit({
+    temperatura: temperatura,
+    umidade: umidade,
+    pressao: pressao,
+    ppm: ppm,
+    altitude: altitude,
+    orvalho: orvalho
+  });
+
+  if (!resultado) {
+    return ContentService.createTextOutput(
+      "Google Sheets atualizado, mas houve erro no Adafruit IO"
+    );
+  }
+
+  return ContentService.createTextOutput(
+    "Sucesso: Google Sheets e Adafruit IO atualizados"
+  );
+}
+
+
+function enviarAdafruit(dados) {
+
+  var propriedades =
+    PropertiesService.getScriptProperties();
+
+  var usuario = propriedades.getProperty("AIO_USERNAME");
+  var chave = propriedades.getProperty("AIO_KEY");
+
+  var grupo = "estacao-ambiental";
+
+  if (!usuario || !chave) {
+    console.error("Configure AIO_USERNAME e AIO_KEY");
+    return false;
+  }
+
+  var url =
+    "https://io.adafruit.com/api/v2/" +
+    usuario +
+    "/groups/" +
+    grupo +
+    "/data";
+
+  var payload = {
+    feeds: [
+      { key: "temperatura", value: String(dados.temperatura) },
+      { key: "umidade", value: String(dados.umidade) },
+      { key: "pressao", value: String(dados.pressao) },
+      { key: "ppm", value: String(dados.ppm) },
+      { key: "altitude", value: String(dados.altitude) },
+      { key: "orvalho", value: String(dados.orvalho) }
+    ]
+  };
+
+  try {
+    var resposta = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        "X-AIO-Key": chave
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    var codigo = resposta.getResponseCode();
+
+    console.log("Resposta Adafruit: " + codigo);
+    console.log(resposta.getContentText());
+
+    return codigo >= 200 && codigo < 300;
+
+  } catch (erro) {
+    console.error("Erro Adafruit: " + erro);
+    return false;
+  }
+}

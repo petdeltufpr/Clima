@@ -75,7 +75,7 @@
     <article class="card"><div class="metric-top"><span>Ponto de orvalho</span><span class="metric-icon" aria-hidden="true"></span></div><div class="value" id="dewpoint">— <span class="unit">°C</span></div><div class="metric-foot" id="dewpointTime">Aguardando leitura</div></article>
   </section>
 
-  <div class="section-title"><h2>Histórico dos sensores</h2><span class="hint">Até 30 leituras mais recentes por variável</span></div>
+  <div class="section-title"><h2>Histórico dos sensores</h2><span class="hint">Até 60 leituras mais recentes por variável</span></div>
   <section class="charts">
     <article class="chart-card"><div class="chart-title">Temperatura (°C)</div><div class="canvas-wrap"><canvas id="chartTemperature"></canvas></div></article>
     <article class="chart-card"><div class="chart-title">Umidade relativa (%)</div><div class="canvas-wrap"><canvas id="chartHumidity"></canvas></div></article>
@@ -92,7 +92,7 @@
   const USERNAME = "matheusalves";
   const GROUP_KEY = "estacao-climatica";
   const REFRESH_MS = 60000;
-  const HISTORY_LIMIT = 30;
+  const HISTORY_LIMIT = 60;
 
 const sensors = {
   temperatura: {

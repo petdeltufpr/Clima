@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#087fc1">
-  <title>Estação Ambiental | Monitoramento</title>
+  <title>Estação climática | Monitoramento</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root{color-scheme:light;--blue:#087fc1;--blue-dark:#075889;--bg:#f1f3f5;--panel:#fff;--line:#e5e9ed;--muted:#647789;--text:#183449;--accent:#1596d2}
@@ -89,27 +89,60 @@
     <article class="chart-card"><div class="chart-title">Altitude estimada (m)</div><div class="canvas-wrap"><canvas id="chartAltitude"></canvas></div></article>
     <article class="chart-card"><div class="chart-title">Ponto de orvalho (°C)</div><div class="canvas-wrap"><canvas id="chartDewpoint"></canvas></div></article>
   </section>
-
-  <div class="notice">* A leitura do MQ-135 depende de aquecimento, calibração e condições do sensor. Não interprete este número como medição certificada de CO₂ ou como diagnóstico de segurança do ar. A altitude também é uma estimativa baseada na pressão de referência configurada no ESP32.</div>
   <div class="footer"><span>Fonte dos dados: Adafruit IO · Conta: matheusalves</span><span id="updatedAt">Última atualização: —</span><button id="refreshButton" type="button">Atualizar agora ↻</button></div>
 </div>
 
 <script>
   // As chaves abaixo devem corresponder aos feeds criados no grupo do Adafruit IO.
   const USERNAME = "matheusalves";
-  const GROUP_KEY = "estacao-ambiental";
+  const GROUP_KEY = "estacao-climatica";
   const REFRESH_MS = 60000;
   const HISTORY_LIMIT = 60;
 
-  const sensors = {
-    temperatura: {element:"temperature", time:"temperatureTime", chart:"chartTemperature", label:"Temperatura", unit:"°C"},
-    umidade:     {element:"humidity", time:"humidityTime", chart:"chartHumidity", label:"Umidade", unit:"%"},
-    pressao:     {element:"pressure", time:"pressureTime", chart:"chartPressure", label:"Pressão", unit:"hPa"},
-    ppm:         {element:"gas", time:"gasTime", chart:"chartGas", label:"MQ-135", unit:""},
-    altitude:   {element:"altitude", time:"altitudeTime", chart:"chartAltitude", label:"Altitude", unit:"m"},
-    orvalho:    {element:"dewpoint", time:"dewpointTime", chart:"chartDewpoint", label:"Ponto de orvalho", unit:"°C"}
-  };
-
+const sensors = {
+  temperatura: {
+    element:"temperature",
+    time:"temperatureTime",
+    chart:"chartTemperature",
+    label:"Temperatura",
+    unit:"°C"
+  },
+  umidade: {
+    element:"humidity",
+    time:"humidityTime",
+    chart:"chartHumidity",
+    label:"Umidade",
+    unit:"%"
+  },
+  pressao: {
+    element:"pressure",
+    time:"pressureTime",
+    chart:"chartPressure",
+    label:"Pressão",
+    unit:"hPa"
+  },
+  gases: {
+    element:"gas",
+    time:"gasTime",
+    chart:"chartGas",
+    label:"MQ-135",
+    unit:""
+  },
+  altitude: {
+    element:"altitude",
+    time:"altitudeTime",
+    chart:"chartAltitude",
+    label:"Altitude",
+    unit:"m"
+  },
+  "ponto-de-orvalho": {
+    element:"dewpoint",
+    time:"dewpointTime",
+    chart:"chartDewpoint",
+    label:"Ponto de orvalho",
+    unit:"°C"
+  }
+};
   const charts = {};
   const fmt = value => Number(value).toLocaleString("pt-BR", {maximumFractionDigits:2});
   const dateFmt = value => new Date(value).toLocaleString("pt-BR", {dateStyle:"short",timeStyle:"short"});

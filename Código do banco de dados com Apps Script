@@ -1,78 +1,97 @@
+
+// FUNCAO DE AUTORIZACAO
+
+function autorizarAcessoExterno() {
+  var resposta = UrlFetchApp.fetch("https://www.google.com");
+  console.log("Autorizacao externa: " + resposta.getResponseCode());
+}
+
+// FUNCAO PRINCIPAL
+
 function doGet(e) {
-  var sheet = SpreadsheetApp
-    .getActiveSpreadsheet()
-    .getActiveSheet();
 
-  var temperatura = Number(e.parameter.temperatura);
-  var umidade = Number(e.parameter.umidade);
-  var pressao = Number(e.parameter.pressao);
-  var ppm = Number(e.parameter.ppm);
-  var altitude = Number(e.parameter.altitude);
-  var orvalho = Number(e.parameter.orvalho);
+  // Receber os dados enviados pelo ESP32
+  var dados = {
+    temperatura: Number(e.parameter.temperatura),
+    umidade: Number(e.parameter.umidade),
+    pressao: Number(e.parameter.pressao),
+    ppm: Number(e.parameter.ppm),
+    altitude: Number(e.parameter.altitude),
+    orvalho: Number(e.parameter.orvalho)
+  };
 
+  // Validar os dados
   var valores = [
-    temperatura,
-    umidade,
-    pressao,
-    ppm,
-    altitude,
-    orvalho
+    dados.temperatura,
+    dados.umidade,
+    dados.pressao,
+    dados.ppm,
+    dados.altitude,
+    dados.orvalho
   ];
 
   if (!valores.every(Number.isFinite)) {
     return ContentService.createTextOutput(
-      "Erro: dados invalidos"
+      "Erro: dados recebidos invalidos"
     );
   }
 
-  var dataHora = new Date();
+  // Salvar no Google Sheets
+  try {
+    var planilha = SpreadsheetApp
+      .getActiveSpreadsheet()
+      .getActiveSheet();
 
-  // 1. Salvar no Google Sheets
-  sheet.appendRow([
-    dataHora,
-    temperatura,
-    umidade,
-    pressao,
-    ppm,
-    altitude,
-    orvalho
-  ]);
+    planilha.appendRow([
+      new Date(),
+      dados.temperatura,
+      dados.umidade,
+      dados.pressao,
+      dados.ppm,
+      dados.altitude,
+      dados.orvalho
+    ]);
 
-  // 2. Enviar para Adafruit IO
-  var resultado = enviarAdafruit({
-    temperatura: temperatura,
-    umidade: umidade,
-    pressao: pressao,
-    ppm: ppm,
-    altitude: altitude,
-    orvalho: orvalho
-  });
-
-  if (!resultado) {
+  } catch (erro) {
     return ContentService.createTextOutput(
-      "Google Sheets atualizado, mas houve erro no Adafruit IO"
+      "Erro ao salvar no Google Sheets: " + String(erro)
+    );
+  }
+
+  // Enviar os dados para Adafruit IO
+  var resultado = enviarAdafruit(dados);
+
+  // Retornar o resultado
+  if (!resultado.sucesso) {
+    return ContentService.createTextOutput(
+      "Google Sheets atualizado, mas houve erro no Adafruit IO.\n" +
+      "Codigo HTTP: " + resultado.codigo + "\n" +
+      "Resposta: " + resultado.resposta
     );
   }
 
   return ContentService.createTextOutput(
-    "Sucesso: Google Sheets e Adafruit IO atualizados"
+    "Sucesso! Google Sheets e Adafruit IO atualizados."
   );
 }
 
+// FUNCAO DE ENVIO PARA ADAFRUIT IO
 
 function enviarAdafruit(dados) {
 
-  var propriedades =
-    PropertiesService.getScriptProperties();
+  var propriedades = PropertiesService.getScriptProperties();
 
   var usuario = propriedades.getProperty("AIO_USERNAME");
   var chave = propriedades.getProperty("AIO_KEY");
 
-  var grupo = "estacao-ambiental";
+  var grupo = "estacao-climatica";
 
   if (!usuario || !chave) {
-    console.error("Configure AIO_USERNAME e AIO_KEY");
-    return false;
+    return {
+      sucesso: false,
+      codigo: "CONFIG",
+      resposta: "AIO_USERNAME ou AIO_KEY nao configurados."
+    };
   }
 
   var url =
@@ -87,9 +106,9 @@ function enviarAdafruit(dados) {
       { key: "temperatura", value: String(dados.temperatura) },
       { key: "umidade", value: String(dados.umidade) },
       { key: "pressao", value: String(dados.pressao) },
-      { key: "ppm", value: String(dados.ppm) },
+      { key: "gases", value: String(dados.ppm) },
       { key: "altitude", value: String(dados.altitude) },
-      { key: "orvalho", value: String(dados.orvalho) }
+      { key: "ponto-de-orvalho", value: String(dados.orvalho) }
     ]
   };
 
@@ -105,14 +124,25 @@ function enviarAdafruit(dados) {
     });
 
     var codigo = resposta.getResponseCode();
+    var texto = resposta.getContentText();
 
-    console.log("Resposta Adafruit: " + codigo);
-    console.log(resposta.getContentText());
+    console.log("Codigo HTTP: " + codigo);
+    console.log("Resposta Adafruit: " + texto);
 
-    return codigo >= 200 && codigo < 300;
+    return {
+      sucesso: codigo >= 200 && codigo < 300,
+      codigo: codigo,
+      resposta: texto
+    };
 
   } catch (erro) {
-    console.error("Erro Adafruit: " + erro);
-    return false;
+    console.error("Erro na comunicacao: " + String(erro));
+
+    return {
+      sucesso: false,
+      codigo: "EXCECAO",
+      resposta: String(erro)
+    };
   }
 }
+
